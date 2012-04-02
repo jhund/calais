@@ -12,6 +12,7 @@ module Calais
       :products => 'type/er/Product',
       :instances => 'type/sys/InstanceInfo',
       :relevances => 'type/sys/RelevanceInfo',
+      :socialtags => 'type/tag/SocialTag'
     }
 
     attr_accessor :submitter_code, :signature, :language, :submission_date, :request_id, :doc_title, :doc_date
@@ -121,13 +122,12 @@ module Calais
           node.remove
         end
 
-        @socialtags = doc.root.xpath("rdf:Description/c:socialtag/..").map do |node|
+        @socialtags = doc.root.xpath("rdf:Description/rdf:type[contains(@rdf:resource, '#{MATCHERS[:socialtags]}')]/..").map do |node|
           tag = SocialTag.new
-          tag.name = node.xpath("c:name[1]").first.content
-          tag.importance = node.xpath("c:importance[1]").first.content.to_i
+          tag.name = node.xpath("c:name").first.content
+          tag.importance = node.xpath("c:importance").first.content.to_i
 
-          node.remove if node.xpath("c:categoryName[1]").first.nil?
-
+          node.remove
           tag
         end
 
