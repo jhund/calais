@@ -7,13 +7,15 @@ module Calais
       :doccat => 'DocCat',
       :entities => 'type/em/e',
       :relations => 'type/em/r',
-      :geographies => 'type/er',
+      :geographies => 'type/er/Geo',
+      :companies => 'type/er/Company',
+      :products => 'type/er/Product',
       :instances => 'type/sys/InstanceInfo',
       :relevances => 'type/sys/RelevanceInfo',
     }
 
     attr_accessor :submitter_code, :signature, :language, :submission_date, :request_id, :doc_title, :doc_date
-    attr_accessor :hashes, :entities, :relations, :geographies, :categories, :socialtags
+    attr_accessor :hashes, :entities, :relations, :geographies, :companies, :categories, :socialtags
 
     def initialize(rdf_string)
       @raw_response = rdf_string
@@ -22,6 +24,8 @@ module Calais
       @entities = []
       @relations = []
       @geographies = []
+      @companies = []
+      @products = []
       @relevances = {} # key = String hash, val = Float relevance
       @categories = []
       @socialtags = []
@@ -38,6 +42,14 @@ module Calais
     end
 
     class Geography
+      attr_accessor :name, :calais_hash, :attributes
+    end
+
+    class Company
+      attr_accessor :name, :calais_hash, :attributes
+    end
+
+    class Product
       attr_accessor :name, :calais_hash, :attributes
     end
 
@@ -81,15 +93,15 @@ module Calais
 
     private
       def extract_data
-        doc = Nokogiri::XML(@raw_response)
+      doc = Nokogiri::XML(@raw_response)
 
         if doc.root.xpath("/Error[1]").first
           raise Calais::Error, doc.root.xpath("/Error/Exception").first.content
-        end        
+        end
 
         doc.root.xpath("rdf:Description/rdf:type[contains(@rdf:resource, '#{MATCHERS[:docinfometa]}')]/..").each do |node|
-          @language = node['language']
-          @submission_date =  DateTime.parse node['submissionDate']
+          @language = node['c:language']
+          @submission_date =  DateTime.parse(node['c:submissionDate'])
 
           attributes = extract_attributes(node.xpath("*[contains(name(), 'c:')]"))
 
@@ -100,12 +112,11 @@ module Calais
         end
 
         doc.root.xpath("rdf:Description/rdf:type[contains(@rdf:resource, '#{MATCHERS[:docinfo]}')]/..").each do |node|
-          @request_id = node['calaisRequestID']
+          @request_id = node['c:calaisRequestID']
 
           attributes = extract_attributes(node.xpath("*[contains(name(), 'c:')]"))
-
           @doc_title = attributes.delete('docTitle')
-          @doc_date = Date.parse(attributes.delete('docDate')) 
+          @doc_date = Date.parse(attributes.delete('docDate'))
 
           node.remove
         end
@@ -114,9 +125,9 @@ module Calais
           tag = SocialTag.new
           tag.name = node.xpath("c:name[1]").first.content
           tag.importance = node.xpath("c:importance[1]").first.content.to_i
-          
+
           node.remove if node.xpath("c:categoryName[1]").first.nil?
-          
+
           tag
         end
 
@@ -131,15 +142,15 @@ module Calais
         end
 
         @relevances = doc.root.xpath("rdf:Description/rdf:type[contains(@rdf:resource, '#{MATCHERS[:relevances]}')]/..").inject({}) do |acc, node|
-          subject_hash = node.xpath("c:subject[1]").first[:resource].split('/')[-1]
-          acc[subject_hash] = node.xpath("c:relevance[1]").first.content.to_f
+          subject_hash = node.xpath("c:subject").first['rdf:resource'].split('/')[-1]
+          acc[subject_hash] = node.xpath("c:relevance").first.content.to_f
 
           node.remove
           acc
         end
 
         @entities = doc.root.xpath("rdf:Description/rdf:type[contains(@rdf:resource, '#{MATCHERS[:entities]}')]/..").map do |node|
-          extracted_hash = node['about'].split('/')[-1] rescue nil
+          extracted_hash = node['rdf:about'].split('/')[-1] rescue nil
 
           entity = Entity.new
           entity.calais_hash = CalaisHash.find_or_create(extracted_hash, @hashes)
@@ -154,7 +165,7 @@ module Calais
         end
 
         @relations = doc.root.xpath("rdf:Description/rdf:type[contains(@rdf:resource, '#{MATCHERS[:relations]}')]/..").map do |node|
-          extracted_hash = node['about'].split('/')[-1] rescue nil
+          extracted_hash = node['rdf:about'].split('/')[-1] rescue nil
 
           relation = Relation.new
           relation.calais_hash = CalaisHash.find_or_create(extracted_hash, @hashes)
@@ -178,6 +189,30 @@ module Calais
           geography
         end
 
+        @companies = doc.root.xpath("rdf:Description/rdf:type[contains(@rdf:resource, '#{MATCHERS[:companies]}')]/..").map do |node|
+          attributes = extract_attributes(node.xpath("*[contains(name(), 'c:')]"))
+
+          company = Company.new
+          company.name = attributes.delete('name')
+          company.calais_hash = attributes.delete('subject')
+          company.attributes = attributes
+
+          node.remove
+          company
+        end
+
+        @products = doc.root.xpath("rdf:Description/rdf:type[contains(@rdf:resource, '#{MATCHERS[:products]}')]/..").map do |node|
+          attributes = extract_attributes(node.xpath("*[contains(name(), 'c:')]"))
+
+          product = Product.new
+          product.name = attributes.delete('name')
+          product.calais_hash = attributes.delete('subject')
+          product.attributes = attributes
+
+          node.remove
+          product
+        end
+
         doc.root.xpath("rdf:Description/rdf:type[contains(@rdf:resource, '#{MATCHERS[:defaultlangid]}')]/..").each { |node| node.remove }
         doc.root.xpath("./*").each { |node| node.remove }
 
@@ -186,7 +221,7 @@ module Calais
 
       def extract_instances(doc, hash)
         doc.root.xpath("rdf:Description/rdf:type[contains(@rdf:resource, '#{MATCHERS[:instances]}')]/..").select do |instance_node|
-          instance_node.xpath("c:subject[1]").first[:resource].split("/")[-1] == hash
+          instance_node.xpath("c:subject").first['rdf:resource'].split("/")[-1] == hash
         end.map do |instance_node|
           instance = Instance.from_node(instance_node)
           instance_node.remove
