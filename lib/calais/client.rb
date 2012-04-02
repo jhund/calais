@@ -32,39 +32,37 @@ module Calais
 
     def params_xml
       check_params
-      document = Nokogiri::XML::Document.new
-      
-      params_node = Nokogiri::XML::Node.new('c:params', document)
-      params_node['xmlns:c'] = 'http://s.opencalais.com/1/pred/'
-      params_node['xmlns:rdf'] = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#'
-      
-      processing_node = Nokogiri::XML::Node.new('c:processingDirectives', document)
-      processing_node['c:contentType'] = AVAILABLE_CONTENT_TYPES[@content_type] if @content_type
-      processing_node['c:outputFormat'] = AVAILABLE_OUTPUT_FORMATS[@output_format] if @output_format
-      processing_node['c:calculateRelevanceScore'] = 'false' if @calculate_relevance == false
-      processing_node['c:reltagBaseURL'] = @reltag_base_url.to_s if @reltag_base_url
-      
-      processing_node['c:enableMetadataType'] = @metadata_enables.join(',') unless @metadata_enables.empty?
-      processing_node['c:docRDFaccessible'] = @store_rdf if @store_rdf
-      processing_node['c:discardMetadata'] = @metadata_discards.join(';') unless @metadata_discards.empty?
-      processing_node['c:omitOutputtingOriginalText'] = 'true' if @omit_outputting_original_text
-      
-      user_node = Nokogiri::XML::Node.new('c:userDirectives', document)
-      user_node['c:allowDistribution'] = @allow_distribution.to_s unless @allow_distribution.nil?
-      user_node['c:allowSearch'] = @allow_search.to_s unless @allow_search.nil?
-      user_node['c:externalID'] = @external_id.to_s if @external_id
-      user_node['c:submitter'] = @submitter.to_s if @submitter
-      
-      params_node << processing_node
-      params_node << user_node
-      
-      if @external_metadata
-        external_node = Nokogiri::XML::Node.new('c:externalMetadata', document)
-        external_node << @external_metadata
-        params_node << external_node
-      end
-      
-      params_node.to_xml(:indent => 2)
+      Nokogiri::XML::Builder.new do |xml|
+        xml.params do
+          # add namespaces, store the opencalais one for later reference
+          ns = xml.doc.root.add_namespace_definition('c', 'http://s.opencalais.com/1/pred/')
+          xml.doc.root.add_namespace_definition('rdf', 'http://www.w3.org/1999/02/22-rdf-syntax-ns#')
+          # assign the saved namespace to params node
+          xml.doc.root.namespace = ns
+
+          xml['c'].processingDirectives(
+            :calculateRelevanceScore => ('false' if @calculate_relevance == false),
+            :contentType => (AVAILABLE_CONTENT_TYPES[@content_type] if @content_type),
+            :discardMetadata => (@metadata_discards.join(';') unless @metadata_discards.empty?),
+            :docRDFaccessible => (@store_rdf if @store_rdf),
+            :enableMetadataType => (@metadata_enables.join(',') unless @metadata_enables.empty?),
+            :omitOutputtingOriginalText => ('true' if @omit_outputting_original_text),
+            :outputFormat => (AVAILABLE_OUTPUT_FORMATS[@output_format] if @output_format),
+            :reltagBaseURL => (@reltag_base_url.to_s if @reltag_base_url)
+          )
+
+          xml['c'].userDirectives(
+            :allowDistribution => (@allow_distribution.to_s unless @allow_distribution.nil?),
+            :allowSearch => (@allow_search.to_s unless @allow_search.nil?),
+            :externalID => (@external_id.to_s if @external_id),
+            :submitter => (@submitter.to_s if @submitter)
+          )
+
+          if @external_metadata
+            xml['c'].externalMetadata = @external_metadata
+          end
+        end
+      end.to_xml(:indent => 2)
     end
 
     def url
