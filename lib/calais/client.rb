@@ -41,21 +41,21 @@ module Calais
           xml.doc.root.namespace = ns
 
           xml['c'].processingDirectives(
-            :calculateRelevanceScore => ('false' if @calculate_relevance == false),
-            :contentType => (AVAILABLE_CONTENT_TYPES[@content_type] if @content_type),
-            :discardMetadata => (@metadata_discards.join(';') unless @metadata_discards.empty?),
-            :docRDFaccessible => (@store_rdf if @store_rdf),
-            :enableMetadataType => (@metadata_enables.join(',') unless @metadata_enables.empty?),
-            :omitOutputtingOriginalText => ('true' if @omit_outputting_original_text),
-            :outputFormat => (AVAILABLE_OUTPUT_FORMATS[@output_format] if @output_format),
-            :reltagBaseURL => (@reltag_base_url.to_s if @reltag_base_url)
+            'c:calculateRelevanceScore' => ('false' if @calculate_relevance == false),
+            'c:contentType' => (AVAILABLE_CONTENT_TYPES[@content_type] if @content_type),
+            'c:discardMetadata' => (@metadata_discards.join(';') unless @metadata_discards.empty?),
+            'c:docRDFaccessible' => (@store_rdf if @store_rdf),
+            'c:enableMetadataType' => (@metadata_enables.join(',') unless @metadata_enables.empty?),
+            'c:omitOutputtingOriginalText' => ('true' if @omit_outputting_original_text),
+            'c:outputFormat' => (AVAILABLE_OUTPUT_FORMATS[@output_format] if @output_format),
+            'c:reltagBaseURL' => (@reltag_base_url.to_s if @reltag_base_url)
           )
 
           xml['c'].userDirectives(
-            :allowDistribution => (@allow_distribution.to_s unless @allow_distribution.nil?),
-            :allowSearch => (@allow_search.to_s unless @allow_search.nil?),
-            :externalID => (@external_id.to_s if @external_id),
-            :submitter => (@submitter.to_s if @submitter)
+            'c:allowDistribution' => (@allow_distribution.to_s unless @allow_distribution.nil?),
+            'c:allowSearch' => (@allow_search.to_s unless @allow_search.nil?),
+            'c:externalID' => (@external_id.to_s if @external_id),
+            'c:submitter' => (@submitter.to_s if @submitter)
           )
 
           if @external_metadata
