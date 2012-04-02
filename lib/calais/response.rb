@@ -231,7 +231,7 @@ module Calais
       end
 
       def extract_type(node)
-        node.xpath("*[name()='rdf:type']")[0]['resource'].split('/')[-1]
+        node.xpath("*[name()='rdf:type']")[0]['rdf:resource'].split('/')[-1]
       rescue
         nil
       end
